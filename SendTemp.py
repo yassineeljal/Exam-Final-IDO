@@ -1,5 +1,6 @@
 import paho.mqtt.client as pmc
 from time import sleep
+import time
 import pigpio 
 from pigpio_dht import DHT11
 
@@ -11,7 +12,6 @@ PORT = 1883
 TOPIC = "final/takfayassine/T"
 TOPIC2 = "final/takfayassine/H"
 BOUTON=3
-LED =26
 
 pi = pigpio.pi()
 pi.set_mode(BOUTON,pigpio.INPUT)
@@ -32,19 +32,42 @@ client.connect(BROKER,PORT)
 
 pi = pigpio.pi()
 pi.set_mode(BOUTON,pigpio.INPUT)
-pi.set_pull_up_down(BOUTON,pigpio.PUD_UP)
 TEMPERATURE = str(result.get("temp_c"))
 HUMIDITY = str(result.get("humidity"))
+ETAT = True
+
+
+def sendData():
+    global ETAT
+    if(pi.read(BOUTON == 0)):
+        start = time.time()
+        while True:
+            if(pi.read(BOUTON == 1)):
+                end = time.time()
+                if(end - start >= 2):
+                    if(ETAT):
+                        ETAT = False
+                    else:
+                        ETAT = True
+                    break
+                else:
+                    break
+
 
 #https://www.geeksforgeeks.org/how-to-create-a-countdown-timer-using-python/
 def countdown(t): 
+    global ETAT
     while t: 
-        if(pi.read(BOUTON)):
-            result = sensor.read()
-            TEMPERATURE = str(result.get("temp_c"))
-            HUMIDITY = str(result.get("humidity"))
-            client.publish(TOPIC, TEMPERATURE)
-            client.publish(TOPIC2, HUMIDITY)    
+        if(pi.read(BOUTON) == 0):
+            print("boutton cliquer")
+            while True:
+                if(pi.read(BOUTON) == 1):
+                    result = sensor.read()
+                    TEMPERATURE = str(result.get("temp_c"))
+                    HUMIDITY = str(result.get("humidity"))
+                    client.publish(TOPIC, TEMPERATURE)
+                    client.publish(TOPIC2, HUMIDITY)  
+                    break
 
         mins, secs = divmod(t, 60) 
         timer = '{:02d}:{:02d}'.format(mins, secs) 
@@ -54,9 +77,15 @@ def countdown(t):
 
 while True:
     try:
-        countdown(30)
-        TEMPERATURE = str(result.get("temp_c"))
-        HUMIDITY = str(result.get("humidity"))
+        if ETAT == True:
+            countdown(10)
+            TEMPERATURE = str(result.get("temp_c"))
+            HUMIDITY = str(result.get("humidity"))
+            client.publish(TOPIC, TEMPERATURE)
+            client.publish(TOPIC2, HUMIDITY)  
+        else:
+            sendData()
+            continue
     except TimeoutError:
         print("Expired")
 
