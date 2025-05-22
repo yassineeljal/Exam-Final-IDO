@@ -1,3 +1,4 @@
+# Code de Yassine
 import paho.mqtt.client as pmc
 from time import sleep
 import time
@@ -8,16 +9,17 @@ from flask import Flask, jsonify, request
 
 
 gpio = 4
-sensor = DHT11(gpio)
-
 BROKER = "mqttbroker.lan"
 PORT = 1883
 TOPIC = "final/takfayassine/T"
 TOPIC2 = "final/takfayassine/H"
 BOUTON=3
+LED_BLANCHE = 13
 
 pi = pigpio.pi()
 pi.set_mode(BOUTON,pigpio.INPUT)
+pi.set_mode(LED_BLANCHE, pigpio.OUTPUT)
+
 
 def connexion(client, userData, flags, code, proprietes):
     if code == 0:
@@ -25,8 +27,9 @@ def connexion(client, userData, flags, code, proprietes):
     else:
         print("Erreur connexion code: ", code)
     
-sensor = DHT11(gpio)
+sensor = DHT11(gpio,timeout_secs=1)
 result = sensor.read()      
+
 
 
 client = pmc.Client(pmc.CallbackAPIVersion.VERSION2)
@@ -50,8 +53,8 @@ pi = pigpio.pi()
 def get_temp():
   global TEMPERATURE, HUMIDITY
   return jsonify({
-     'T': TEMPERATURE,
-     'H': HUMIDITY
+     'T': str(result.get("temp_c")),
+     'H': str(result.get("humidity"))
   })
 
 @app.route('/etat', methods=['POST'])
@@ -86,13 +89,27 @@ def Button_hold():
                     if(ETAT):
                         ETAT = False
                         print("Programme mis en pause")
+                        sleep(0.1)
                         break
                     else:
                         ETAT = True
                         print("Programme mis en start")
+                        sleep(0.1)
                         break
                 else:
+                    sleep(0.5)
                     continue
+
+
+def Open_led():
+    while True:
+        if pi.read(LED_BLANCHE) == 0 and ETAT:
+            pi.write(LED_BLANCHE, 1) 
+        elif pi.read(LED_BLANCHE) == 1 and not ETAT:
+            pi.write(LED_BLANCHE, 0) 
+        
+
+
 
 
 def Button_press():
@@ -108,9 +125,9 @@ def Button_press():
                         client.publish(TOPIC, TEMPERATURE)
                         client.publish(TOPIC2, HUMIDITY)  
                         print("Les infos ont été envoyées (button)")
-
                         break
         else:
+            sleep(0.5)
             continue
 
 
@@ -128,26 +145,37 @@ def SendDataEach30sec():
     while True:
         global ETAT, TEMPERATURE, HUMIDITY
         if (ETAT):
+            sleep(0.5)
             countdown(30)
             result = sensor.read()
             TEMPERATURE = str(result.get("temp_c"))
             HUMIDITY = str(result.get("humidity"))
+            sleep(0.1)
             client.publish(TOPIC, TEMPERATURE)
             client.publish(TOPIC2, HUMIDITY)  
             print("Les infos ont été envoyées (30sec)")
 
         else:
+            sleep(0.5)
             continue
 
+
 chrono = threading.Thread(target=SendDataEach30sec)   
-chrono.start()     
-
 hold_button = threading.Thread(target=Button_hold)
-hold_button.start()
-
 press_button = threading.Thread(target=Button_press)
+openLed = threading.Thread(target=Open_led)
+
+
+chrono.start()   
+sleep(0.5)
 press_button.start()
+sleep(0.5)
+hold_button.start()
+sleep(0.5)
+openLed.start()
             
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0',port=3000)
+
+    

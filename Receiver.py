@@ -1,3 +1,5 @@
+#code de takfa
+
 import paho.mqtt.client as pmc
 import pigpio
 import time
@@ -9,17 +11,14 @@ TOPIC_H = "final/+/H"
 
 LED_ROUGE = 19
 LED_BLEU = 26
-LED_BLANCHE = 13
 
 hostname = "takfayassine" 
 pi = pigpio.pi()
 pi.set_mode(LED_ROUGE, pigpio.OUTPUT)
 pi.set_mode(LED_BLEU, pigpio.OUTPUT)
-pi.set_mode(LED_BLANCHE, pigpio.OUTPUT)
 
 dictionnaire_temperature = {}
 dictionnaire_humidite = {}
-dernierEnvoiDeDonnees = 0
 
 def connexion(client, userdata, flags, code, properties=None):
     if code == 0:
@@ -48,10 +47,7 @@ def gestionLeds():
     else:
         pi.write(LED_BLEU, 0)  
 
-
 def reception_msg(client, userdata, msg):
-    global dernierEnvoiDeDonnees
-
     topic = msg.topic
     payload = msg.payload.decode()
 
@@ -69,7 +65,6 @@ def reception_msg(client, userdata, msg):
     host = parts[1]
     mesure = parts[2]
 
-
     print(f"Reçu de {host} | {mesure} = {valeur}")
 
     if mesure == "T":
@@ -78,9 +73,6 @@ def reception_msg(client, userdata, msg):
         dictionnaire_humidite[host] = valeur
     else:
         return
-
-    if host == hostname:
-        dernierEnvoiDeDonnees = time.time()
 
     gestionLeds()
 
@@ -92,16 +84,9 @@ client.loop_start()
 
 try:
     while True:
-        now = time.time()
-        if now - dernierEnvoiDeDonnees <= 35:
-            pi.write(LED_BLANCHE, 1) 
-        else:
-            pi.write(LED_BLANCHE, 0)  
         time.sleep(1)
-
 except KeyboardInterrupt:
     print("Fin du programme.")
     pi.write(LED_ROUGE, 0)
-    pi.write(LED_BLEU, 0)
-    pi.write(LED_BLANCHE, 0)
+    pi.write(LED_BLEU, 0) 
     client.disconnect()
